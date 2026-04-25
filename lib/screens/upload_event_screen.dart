@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/auth_service.dart';
+import '../services/event_service.dart';
+
+const _categoryOptions = ['Meal', 'Outside Event', 'NYU Event'];
 
 class UploadEventScreen extends StatefulWidget {
   const UploadEventScreen({super.key});
@@ -15,6 +19,8 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
   final _partyController = TextEditingController();
   final _messageController = TextEditingController();
   File? _photo;
+  String _selectedCategory = _categoryOptions[0];
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -30,9 +36,68 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
     if (picked != null) setState(() => _photo = File(picked.path));
   }
 
-  void _handlePost() {
-    // TODO: send event data to backend
-    Navigator.pop(context);
+  // Parses strings like "10 AM", "10:30 AM", "14:00", or "2 pm" into a
+  // DateTime today (or tomorrow if the slot has already passed). Falls
+  // back to one hour from now when the input can't be understood.
+  DateTime _parseEndTime(String raw) {
+    final now = DateTime.now();
+    final s = raw.trim().toUpperCase();
+    final match = RegExp(r'^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$').firstMatch(s);
+    if (match == null) return now.add(const Duration(hours: 1));
+
+    var hour = int.tryParse(match.group(1) ?? '') ?? 0;
+    final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+    final period = match.group(3);
+    if (period == 'AM' && hour == 12) hour = 0;
+    if (period == 'PM' && hour < 12) hour += 12;
+    if (hour > 23 || minute > 59) return now.add(const Duration(hours: 1));
+
+    var when = DateTime(now.year, now.month, now.day, hour, minute);
+    if (when.isBefore(now)) when = when.add(const Duration(days: 1));
+    return when;
+  }
+
+  Future<void> _handlePost() async {
+    if (_submitting) return;
+
+    final userId = AuthService().currentUserId;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in again.')),
+      );
+      return;
+    }
+
+    final title = _locationController.text.trim();
+    final capacityText = _partyController.text.trim();
+    final capacity = int.tryParse(capacityText);
+    if (title.isEmpty || capacity == null || capacity < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location and a numeric party size are required.')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await EventService().createEvent(
+        userId: userId,
+        title: title,
+        category: _selectedCategory,
+        endTime: _parseEndTime(_timeController.text),
+        capacity: capacity,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to post: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -143,6 +208,35 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
                     const SizedBox(height: 16),
 
                     _FormField(
+                      label: 'Category',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedCategory,
+                            isExpanded: true,
+                            items: _categoryOptions
+                                .map((c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(c),
+                                    ))
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) {
+                                setState(() => _selectedCategory = v);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _FormField(
                       label: 'Message',
                       child: TextField(
                         controller: _messageController,
@@ -158,20 +252,31 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _handlePost,
+                        onPressed: _submitting ? null : _handlePost,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3B0FA0),
                           foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFF8E7BC4),
+                          disabledForegroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
                           elevation: 0,
                         ),
-                        child: const Text(
-                          'Post',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-                        ),
+                        child: _submitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Post',
+                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 32),

@@ -27,6 +27,13 @@ class AuthService {
   static const _refreshKey = 'refresh_token';
   final _storage = const FlutterSecureStorage();
 
+  Map<String, dynamic>? _cachedUser;
+  Map<String, dynamic>? get currentUser => _cachedUser;
+  int? get currentUserId => _cachedUser?['user_id'] as int?;
+
+  String get baseUrl => _baseUrl;
+  Future<String?> get accessToken => _storage.read(key: _tokenKey);
+
   static const String _googleServerClientId =
       '705900658517-r50uqjrchabf5q5i71m99me9vqes8nnr.apps.googleusercontent.com';
 
@@ -73,9 +80,11 @@ class AuthService {
     await _storage.write(key: _tokenKey, value: body['token'] as String);
     await _storage.write(key: _refreshKey, value: body['refreshToken'] as String);
 
+    _cachedUser = body['user'] as Map<String, dynamic>?;
+
     return SignInResult(
       hasProfile: body['hasProfile'] as bool? ?? false,
-      user: body['user'] as Map<String, dynamic>?,
+      user: _cachedUser,
     );
   }
 
@@ -110,7 +119,8 @@ class AuthService {
     if (response.statusCode != 200) {
       throw Exception(body['message'] ?? 'Profile update failed.');
     }
-    return body['user'] as Map<String, dynamic>;
+    _cachedUser = body['user'] as Map<String, dynamic>?;
+    return _cachedUser!;
   }
 
   Future<SignInResult?> getMe() async {
@@ -128,9 +138,10 @@ class AuthService {
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
+    _cachedUser = body['user'] as Map<String, dynamic>?;
     return SignInResult(
       hasProfile: body['hasProfile'] as bool? ?? false,
-      user: body['user'] as Map<String, dynamic>?,
+      user: _cachedUser,
     );
   }
 
@@ -149,6 +160,7 @@ class AuthService {
   Future<void> clearTokens() async {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshKey);
+    _cachedUser = null;
   }
 
   Future<String?> getStoredToken() => _storage.read(key: _tokenKey);

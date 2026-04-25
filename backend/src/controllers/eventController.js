@@ -1,9 +1,19 @@
-const supabase = require('../config/supabase');
+const { createClient } = require('@supabase/supabase-js');
 
-// GET /api/events
-// 모든 이벤트 조회
+function clientWithToken(token) {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+}
+
+function tokenFrom(req) {
+  return req.headers.authorization.split(' ')[1];
+}
+
+// GET /api/events — list all events
 exports.getEvents = async (req, res, next) => {
   try {
+    const supabase = clientWithToken(tokenFrom(req));
     const { data, error } = await supabase
       .from('event')
       .select('*')
@@ -17,11 +27,11 @@ exports.getEvents = async (req, res, next) => {
   }
 };
 
-// GET /api/events/:id
-// 이벤트 상세 조회
+// GET /api/events/:id — single event
 exports.getEventById = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const supabase = clientWithToken(tokenFrom(req));
 
     const { data, error } = await supabase
       .from('event')
@@ -37,8 +47,7 @@ exports.getEventById = async (req, res, next) => {
   }
 };
 
-// POST /api/events
-// 이벤트 생성
+// POST /api/events — create event
 exports.createEvent = async (req, res, next) => {
   try {
     const { user_id, title, category, end_time, capacity } = req.body;
@@ -49,15 +58,10 @@ exports.createEvent = async (req, res, next) => {
       });
     }
 
+    const supabase = clientWithToken(tokenFrom(req));
     const { data, error } = await supabase
       .from('event')
-      .insert({
-        user_id,
-        title,
-        category,
-        end_time,
-        capacity,
-      })
+      .insert({ user_id, title, category, end_time, capacity })
       .select()
       .single();
 
@@ -72,11 +76,11 @@ exports.createEvent = async (req, res, next) => {
   }
 };
 
-// GET /api/events/my/:userId
-// 특정 유저가 만든 이벤트 조회
+// GET /api/events/my/:userId — events created by a user
 exports.getMyEvents = async (req, res, next) => {
   try {
     const { userId } = req.params;
+    const supabase = clientWithToken(tokenFrom(req));
 
     const { data, error } = await supabase
       .from('event')
@@ -92,8 +96,7 @@ exports.getMyEvents = async (req, res, next) => {
   }
 };
 
-// POST /api/events/:id/join
-// 이벤트 참가
+// POST /api/events/:id/join — join an event
 exports.joinEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -102,6 +105,8 @@ exports.joinEvent = async (req, res, next) => {
     if (!user_id) {
       return res.status(400).json({ message: 'user_id is required.' });
     }
+
+    const supabase = clientWithToken(tokenFrom(req));
 
     const { data: event, error: eventError } = await supabase
       .from('event')
@@ -139,10 +144,7 @@ exports.joinEvent = async (req, res, next) => {
 
     const { data, error } = await supabase
       .from('event_user_link')
-      .insert({
-        user_id,
-        event_id: Number(id),
-      })
+      .insert({ user_id, event_id: Number(id) })
       .select()
       .single();
 
@@ -157,8 +159,7 @@ exports.joinEvent = async (req, res, next) => {
   }
 };
 
-// DELETE /api/events/:id/join
-// 이벤트 참가 취소
+// DELETE /api/events/:id/join — leave an event
 exports.leaveEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -168,6 +169,7 @@ exports.leaveEvent = async (req, res, next) => {
       return res.status(400).json({ message: 'user_id is required.' });
     }
 
+    const supabase = clientWithToken(tokenFrom(req));
     const { error } = await supabase
       .from('event_user_link')
       .delete()
@@ -182,11 +184,11 @@ exports.leaveEvent = async (req, res, next) => {
   }
 };
 
-// GET /api/events/:id/participants
-// 이벤트 참가자 목록 조회
+// GET /api/events/:id/participants — list participants
 exports.getEventParticipants = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const supabase = clientWithToken(tokenFrom(req));
 
     const { data, error } = await supabase
       .from('event_user_link')

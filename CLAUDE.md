@@ -4,54 +4,79 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This is a monorepo with two app surfaces:
+Monorepo with two app surfaces:
 
-- **Root** — Flutter mobile app (Dart, SDK ^3.11.4). Standard Flutter layout: `lib/`, `ios/`, `android/`, `web/`, `pubspec.yaml`.
+- **Root** — Flutter mobile app (Dart SDK `^3.11.4`). Standard layout: `lib/`, `ios/`, `android/`, `web/`, `pubspec.yaml`.
 - **`backend/`** — Node.js + Express REST API backed by Supabase. See `backend/CLAUDE.md` for backend-specific details (auth flow, DB schema, RLS, triggers).
 
-The two halves communicate over HTTP. The Flutter app calls the backend at `http://localhost:3000/api` (or `http://10.0.2.2:3000/api` from an Android emulator); the backend then talks to Supabase using the JS client.
+The Flutter app calls the backend at `http://localhost:3000/api` (or `http://10.0.2.2:3000/api` from an Android emulator); the backend then talks to Supabase using the JS client. **Chat is the exception** — `lib/screens/chat_screen.dart` writes to Firebase Firestore directly, bypassing Express. All other features go through Express → Supabase.
 
 ## Common Commands
 
 **Backend** (run from `backend/`):
 ```bash
-npm run dev    # nodemon — auto-restarts on file changes (preferred for dev)
+npm run dev    # nodemon — preferred for dev
 npm start      # production
 ```
+There are no test/lint commands in `backend/package.json`.
 
 **Flutter** (run from repo root):
 ```bash
 flutter pub get
-flutter run             # requires emulator/device
-flutter run -d chrome   # web
-flutter test            # all widget tests
-flutter test test/widget_test.dart   # single test file
-flutter analyze         # lint via flutter_lints (config in analysis_options.yaml)
+flutter run                                  # requires emulator/device
+flutter run -d <simulator-uuid>              # specific simulator
+flutter run -d chrome --web-port=5555        # web (must use a fixed port — see iOS/Web Auth Gotchas)
+flutter test                                 # all tests
+flutter test test/widget_test.dart           # single test file
+flutter analyze                              # lint via flutter_lints (analysis_options.yaml)
 ```
 
-There are no test or lint commands in `backend/package.json`.
+iOS pods need a re-install whenever a new native plugin lands: `cd ios && pod install`.
 
 ## Architecture
 
-### Backend → Supabase
+### Service singletons
 
-The backend has no ORM — every controller imports the singleton Supabase client (`backend/src/config/supabase.js`) and queries directly. Two non-obvious patterns make the auth flow work and are easy to break:
+`lib/services/auth_service.dart` and `lib/services/event_service.dart` are the only paths to the backend — UI never calls `http` directly. Both are singletons. `AuthService` owns token storage (`flutter_secure_storage`) and an in-memory `_cachedUser`; `EventService` reads `AuthService().accessToken` and `baseUrl` for every request.
 
-1. **`handle_new_user` DB trigger.** Register does NOT insert into `public.user` directly. Instead, profile fields are passed via `supabase.auth.signUp({ options: { data: {...} } })`, and a `SECURITY DEFINER` trigger on `auth.users` reads `raw_user_meta_data` and inserts the row. This bypasses RLS and works even when the client doesn't yet have a session token.
-2. **Logout uses the Supabase REST API directly**, not the JS SDK. The SDK's `signOut()` does not reliably invalidate server-side sessions when called from a stateless server context. The controller calls `POST /auth/v1/logout?scope=global` with the user's bearer token to revoke all sessions globally.
+`AuthService.currentUserId` is the bigint PK from `public.user` and is what every event-related backend call sends in its body. It's populated when `signInWithGoogle` / `completeProfile` / `getMe` returns, and cleared by `clearTokens()`.
 
-RLS policies on `public.user` enforce ownership via `email = auth.email()` — keep this constraint in mind when adding queries that touch the user table from authenticated requests.
+### Splash gate (`lib/main.dart`)
 
-### Flutter app
+`_SplashGate` is the app entry point. It branches on stored token + `hasProfile`:
 
-Currently minimal: `lib/main.dart` plus `lib/screens/sign_in_screen.dart` and `sign_up_screen.dart`. No state management library, no Dio/http client wired up yet — auth screens exist as UI but the API integration is still being built out. `google_sign_in`, `font_awesome_flutter`, and `google_fonts` are the only third-party deps beyond Flutter itself.
+| Stored token? | `hasProfile` | Destination |
+|---|---|---|
+| no | — | `SignInScreen` |
+| yes, but `/me` returns 401 | — | `SignInScreen` (tokens cleared) |
+| yes | `false` | `SignUpScreen` (profile completion) |
+| yes | `true` | `HomeScreen` |
+
+`hasProfile` from the backend is computed as `!!user.gender` — `gender` is the sentinel for "profile completed". Don't rely on any other field for that check.
+
+### Backend-side patterns (cross-link)
+
+`backend/src/controllers/authController.js` and `eventController.js` create **per-request** Supabase clients via local `freshClient()` / `clientWithToken(token)` helpers. **Never** call `signInWithIdToken` / `refreshSession` / `signInWithPassword` on the shared `backend/src/config/supabase.js` singleton — those mutate the client's session and would leak across concurrent requests. The singleton is reserved for stateless calls (`auth.getUser(jwt)` in the protect middleware).
+
+RLS on every `public.*` table is keyed off `auth.email()` resolving to `public.user.user_id`. When adding new tables/policies, mirror the existing pattern: `user_id = (SELECT u.user_id FROM public.user u WHERE u.email = auth.email())`.
+
+### Firebase scope
+
+Firebase is initialized in `main.dart` (`Firebase.initializeApp(...)`) and used **only** by `chat_screen.dart` for Firestore-backed messaging. `firebase_auth` is in `pubspec.yaml` but **is not used** for sign-in — Google sign-in goes through `google_sign_in` → backend `/api/auth/google` → Supabase. Don't add Firebase Auth flows; they would conflict with the existing token model.
+
+## iOS / Web Auth Gotchas
+
+- **iOS Info.plist** must have both `GIDClientID` (iOS OAuth client) and `GIDServerClientID` (Web OAuth client, audience for the id_token Supabase validates) plus the reversed iOS client ID as a URL scheme. Without these, `GoogleSignIn` crashes with "No active configuration."
+- **Web** rejects the `serverClientId` parameter on `GoogleSignIn(...)`. The constructor in `auth_service.dart` gates it with `kIsWeb ? null : _googleServerClientId`. Web reads the client ID from `<meta name="google-signin-client_id">` in `web/index.html`.
+- **Supabase Dashboard → Auth → Providers → Google** must have **Skip nonce checks** enabled. The iOS GoogleSignIn SDK injects a nonce into the id_token but the Flutter package doesn't expose it, so we can't forward it; without skipping, Supabase rejects the token with "Passed nonce and nonce in id_token should either both exist or not."
+- **Web dev** must run on a **fixed port** that's been added to the Web OAuth client's *Authorized JavaScript origins* in Google Cloud Console (the project standard is `http://localhost:5555`).
 
 ## Repo Quirks
 
-- **Build artifacts are tracked.** `.gitignore` excludes `frontend/.dart_tool/` and `frontend/build/`, but the Flutter project lives at the root, so `.dart_tool/`, `build/`, `.idea/`, and `.flutter-plugins-dependencies` are committed. Don't reflexively `rm -rf` them — fix `.gitignore` first if cleaning up.
-- **Empty `frontend/` directory** exists at the root from an earlier reorganization; the live Flutter code is at the root, not inside `frontend/`.
-- **Branch model:** `main` is the integration branch. There is also a long-lived `frontend` branch that gets periodically merged into `main`.
+- **Empty `frontend/` directory** at the root from an earlier reorganization. The live Flutter code is at the root, not inside `frontend/`.
+- **Branch model:** `main` is the integration branch. A long-lived `frontend` branch gets periodically merged into `main` and tends to bring large screen / dependency churn each time.
+- **`backend/.env`** holds `SUPABASE_URL` and `SUPABASE_ANON_KEY`; not committed.
 
 ## Language Convention
 
-All code comments, server response messages, log output, and UI strings must be in English (carried over from `backend/CLAUDE.md`).
+All code comments, server response messages, log output, and UI strings must be in English.
