@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 const _nyuColleges = [
   'College of Arts & Science',
@@ -17,7 +18,14 @@ const _nyuColleges = [
 ];
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  final String? initialName;
+  final bool alreadyCompleted;
+
+  const SignUpScreen({
+    super.key,
+    this.initialName,
+    this.alreadyCompleted = false,
+  });
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -30,6 +38,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _selectedCollege;
   final _ethnicityController = TextEditingController();
   DateTime? _dateOfBirth;
+  bool _submitting = false;
+  bool _completed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialName != null && widget.initialName!.isNotEmpty) {
+      _nickNameController.text = widget.initialName!;
+    }
+    _completed = widget.alreadyCompleted;
+  }
 
   @override
   void dispose() {
@@ -81,8 +100,61 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  void _handleRegister() {
-    // TODO: send profile data to backend
+  String _formatDate(DateTime d) {
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$day';
+  }
+
+  String _computeAge(DateTime dob) {
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+      age -= 1;
+    }
+    return age.toString();
+  }
+
+  Future<void> _handleRegister() async {
+    if (_submitting || _completed) return;
+    if (_genderController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gender is required.')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await AuthService().completeProfile(
+        name: _nickNameController.text.trim().isEmpty
+            ? null
+            : _nickNameController.text.trim(),
+        gender: _genderController.text.trim(),
+        pronouns: _pronounsController.text.trim().isEmpty
+            ? null
+            : _pronounsController.text.trim(),
+        college: _selectedCollege,
+        ethnicity: _ethnicityController.text.trim().isEmpty
+            ? null
+            : _ethnicityController.text.trim(),
+        age: _dateOfBirth != null ? _computeAge(_dateOfBirth!) : null,
+        birthData: _dateOfBirth != null ? _formatDate(_dateOfBirth!) : null,
+      );
+      if (!mounted) return;
+      setState(() => _completed = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile completed!')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save profile: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -121,6 +193,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       label: 'Nick Name',
                       child: TextField(
                         controller: _nickNameController,
+                        enabled: !_completed,
                         decoration: _inputDecoration('NYU Timothée Chalamet...'),
                       ),
                     ),
@@ -129,6 +202,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       label: 'Pronouns',
                       child: TextField(
                         controller: _pronounsController,
+                        enabled: !_completed,
                         decoration: _inputDecoration('She / Her'),
                       ),
                     ),
@@ -137,6 +211,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       label: 'Gender',
                       child: TextField(
                         controller: _genderController,
+                        enabled: !_completed,
                         decoration: _inputDecoration('Male'),
                       ),
                     ),
@@ -144,7 +219,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     _FormField(
                       label: 'Date of Birth',
                       child: GestureDetector(
-                        onTap: _pickDate,
+                        onTap: _completed ? null : _pickDate,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                           decoration: _fieldDecoration(),
@@ -172,7 +247,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     _FormField(
                       label: 'College',
                       child: GestureDetector(
-                        onTap: _pickCollege,
+                        onTap: _completed ? null : _pickCollege,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                           decoration: _fieldDecoration(),
@@ -196,6 +271,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       label: 'Ethnicity',
                       child: TextField(
                         controller: _ethnicityController,
+                        enabled: !_completed,
                         decoration: _inputDecoration('e.g. Asian, Hispanic, White...'),
                       ),
                     ),
@@ -203,20 +279,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _handleRegister,
+                        onPressed: (_submitting || _completed) ? null : _handleRegister,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3B0FA0),
                           foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFF8E7BC4),
+                          disabledForegroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
                           elevation: 0,
                         ),
-                        child: const Text(
-                          'Register',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-                        ),
+                        child: _submitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                _completed ? 'Registered' : 'Register',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 32),

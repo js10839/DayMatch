@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -15,11 +16,33 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _handleSignIn() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      setState(() => _isLoading = false);
-      // TODO: replace with real Google Sign-In + NYU email check once client ID is ready
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen()));
+    try {
+      final result = await AuthService().signInWithGoogle();
+      if (!mounted) return;
+      if (result.hasProfile) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Already registered. Welcome back!')),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SignUpScreen(initialName: result.user?['name'] as String?),
+          ),
+        );
+      }
+    } on NyuOnlyException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign-in failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

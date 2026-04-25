@@ -1,60 +1,85 @@
-const supabase = require('../config/supabase');
-const { isValidEmail } = require('../middlewares/validate');
+const { createClient } = require('@supabase/supabase-js');
 
-exports.register = async (req, res, next) => {
+const NYU_DOMAIN = '@nyu.edu';
+
+// Stateless per-request clients avoid the cross-request session bleed that
+// would happen if controllers called signInWithIdToken / refreshSession on a
+// shared singleton (those calls mutate the client's auth state).
+function freshClient() {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+}
+
+function clientWithToken(token) {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+}
+
+exports.signInWithGoogle = async (req, res, next) => {
   try {
-    const { email, password, name, gender, pronouns, college, ethnicity, age, birth_data } = req.body;
+    const { id_token } = req.body;
 
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ message: 'Invalid email format.' });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters.' });
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name, gender, pronouns, college, ethnicity, age, birth_data },
-      },
+    const authClient = freshClient();
+    const { data, error } = await authClient.auth.signInWithIdToken({
+      provider: 'google',
+      token: id_token,
     });
-    if (error) return res.status(400).json({ message: error.message });
+    if (error) return res.status(401).json({ message: error.message });
 
-    if (!data.session) {
-      return res.status(201).json({ message: 'Registration successful. Please confirm your email.' });
+    const email = data.user?.email || '';
+    if (!email.toLowerCase().endsWith(NYU_DOMAIN)) {
+      await fetch(`${process.env.SUPABASE_URL}/auth/v1/logout?scope=global`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`,
+          apikey: process.env.SUPABASE_ANON_KEY,
+        },
+      });
+      return res.status(403).json({ message: 'Only NYU emails (@nyu.edu) are allowed.' });
     }
 
-    res.status(201).json({
+    const userClient = clientWithToken(data.session.access_token);
+    const { data: userData } = await userClient
+      .from('user')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    res.json({
       token: data.session.access_token,
       refreshToken: data.session.refresh_token,
-      user: { email, name, gender },
+      user: userData,
+      hasProfile: !!userData?.gender,
     });
   } catch (err) {
     next(err);
   }
 };
 
-exports.login = async (req, res, next) => {
+exports.completeProfile = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { name, gender, pronouns, college, ethnicity, age, birth_data } = req.body;
+    const token = req.headers.authorization.split(' ')[1];
+    const userClient = clientWithToken(token);
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(401).json({ message: 'Invalid email or password.' });
+    const updatePayload = { gender };
+    if (name !== undefined) updatePayload.name = name;
+    if (pronouns !== undefined) updatePayload.pronouns = pronouns;
+    if (college !== undefined) updatePayload.college = college;
+    if (ethnicity !== undefined) updatePayload.ethnicity = ethnicity;
+    if (age !== undefined) updatePayload.age = age;
+    if (birth_data !== undefined) updatePayload.birth_data = birth_data;
 
-    const { data: userData, error: dbError } = await supabase
+    const { data: userData, error } = await userClient
       .from('user')
-      .select('*')
-      .eq('email', email)
+      .update(updatePayload)
+      .eq('email', req.user.email)
+      .select()
       .single();
 
-    if (dbError) return res.status(404).json({ message: 'User not found.' });
+    if (error) return res.status(400).json({ message: error.message });
 
-    res.json({
-      token: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      user: userData,
-    });
+    res.json({ user: userData });
   } catch (err) {
     next(err);
   }
@@ -87,7 +112,8 @@ exports.refresh = async (req, res, next) => {
   try {
     const { refresh_token } = req.body;
 
-    const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+    const authClient = freshClient();
+    const { data, error } = await authClient.auth.refreshSession({ refresh_token });
     if (error) return res.status(401).json({ message: 'Invalid or expired refresh token.' });
 
     res.json({
@@ -101,7 +127,10 @@ exports.refresh = async (req, res, next) => {
 
 exports.getMe = async (req, res, next) => {
   try {
-    const { data: userData, error } = await supabase
+    const token = req.headers.authorization.split(' ')[1];
+    const userClient = clientWithToken(token);
+
+    const { data: userData, error } = await userClient
       .from('user')
       .select('*')
       .eq('email', req.user.email)
@@ -109,24 +138,7 @@ exports.getMe = async (req, res, next) => {
 
     if (error) return res.status(404).json({ message: 'User not found.' });
 
-    res.json({ user: userData });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.forgotPassword = async (req, res, next) => {
-  try {
-    const { email } = req.body;
-
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ message: 'Invalid email format.' });
-    }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) return res.status(400).json({ message: error.message });
-
-    res.json({ message: 'Password reset email sent.' });
+    res.json({ user: userData, hasProfile: !!userData.gender });
   } catch (err) {
     next(err);
   }
