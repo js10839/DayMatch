@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'event_detail_screen.dart';
+import 'upload_event_screen.dart';
 
 // Mock data models
 class _Event {
@@ -49,9 +50,10 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFEDE8F5),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: open add event sheet
-        },
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const UploadEventScreen()),
+        ),
         backgroundColor: Colors.white,
         elevation: 4,
         shape: const CircleBorder(),
