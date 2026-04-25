@@ -41,6 +41,9 @@ android/key.properties
 # macOS
 .DS_Store
 
+# Claude Code
+.mcp.json
+
 # Logs
 logs
 *.log
