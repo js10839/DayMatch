@@ -10,6 +10,7 @@ router.get('/', eventController.getEvents);
 router.post('/', eventController.createEvent);
 
 router.get('/my/:userId', eventController.getMyEvents);
+router.get('/joined/:userId', eventController.getJoinedEvents);
 
 router.get('/:id/participants', eventController.getEventParticipants);
 router.post('/:id/join', eventController.joinEvent);

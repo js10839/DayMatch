@@ -98,6 +98,21 @@ class EventService {
         .toList(growable: false);
   }
 
+  Future<List<Event>> listJoinedEvents(int userId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/events/joined/$userId'),
+      headers: await _headers(),
+    );
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception(body['message'] ?? 'Failed to load joined events.');
+    }
+    final list = body['events'] as List<dynamic>;
+    return list
+        .map((e) => Event.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   Future<Event> getEvent(int id) async {
     final response = await http.get(
       Uri.parse('$_baseUrl/events/$id'),

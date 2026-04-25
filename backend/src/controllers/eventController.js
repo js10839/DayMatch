@@ -96,6 +96,34 @@ exports.getMyEvents = async (req, res, next) => {
   }
 };
 
+// GET /api/events/joined/:userId — events the user has joined
+exports.getJoinedEvents = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const supabase = clientWithToken(tokenFrom(req));
+
+    const { data, error } = await supabase
+      .from('event_user_link')
+      .select('event:event(*)')
+      .eq('user_id', userId);
+
+    if (error) return res.status(400).json({ message: error.message });
+
+    const events = (data || [])
+      .map((row) => row.event)
+      .filter(Boolean)
+      .sort((a, b) => {
+        const ta = a.upload_time ? new Date(a.upload_time).getTime() : 0;
+        const tb = b.upload_time ? new Date(b.upload_time).getTime() : 0;
+        return tb - ta;
+      });
+
+    res.json({ events });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /api/events/:id/join — join an event
 exports.joinEvent = async (req, res, next) => {
   try {

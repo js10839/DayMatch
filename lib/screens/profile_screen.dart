@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/event_service.dart';
 import '../widgets/event_card.dart';
+import 'event_detail_screen.dart';
 import 'sign_in_screen.dart';
 
 const _nyuColleges = [
@@ -36,6 +38,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   DateTime? _dateOfBirth;
   String? _selectedCollege;
 
+  late Future<List<Event>> _joinedFuture;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +55,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _dateOfBirth = DateTime.tryParse(birth);
       }
     }
+    _joinedFuture = _loadJoined();
+  }
+
+  Future<List<Event>> _loadJoined() {
+    final me = AuthService().currentUserId;
+    if (me == null) return Future.value(const <Event>[]);
+    return EventService().listJoinedEvents(me);
+  }
+
+  Future<void> _refreshJoined() async {
+    final next = _loadJoined();
+    setState(() {
+      _joinedFuture = next;
+    });
+    await next;
   }
 
   @override
@@ -305,39 +324,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Mock joined events — replace with real data from backend later
-  static const _joinedEvents = [
-    EventData(
-      title: 'Jasper Kane',
-      time: '10 AM',
-      host: 'Colin Sung',
-      category: 'Meal',
-      capacity: '2/2',
-    ),
-  ];
-
   Widget _buildMyEventsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'My Event',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF57068C),
+    return RefreshIndicator(
+      onRefresh: _refreshJoined,
+      child: FutureBuilder<List<Event>>(
+        future: _joinedFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(height: 120),
+                Center(child: CircularProgressIndicator()),
+              ],
+            );
+          }
+          if (snapshot.hasError) {
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              children: [
+                Text(
+                  'Failed to load events.\n${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFF57068C)),
+                ),
+              ],
+            );
+          }
+          final events = snapshot.data ?? const <Event>[];
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Events',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF57068C),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (events.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      "You haven't joined any events yet.",
+                      style: TextStyle(color: Color(0xFF7B4FA8), fontSize: 14),
+                    ),
+                  )
+                else
+                  ...events.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: EventCard(
+                          event: _toCardData(e),
+                          isMyEvent: true,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EventDetailScreen(event: e),
+                              ),
+                            );
+                            if (mounted) await _refreshJoined();
+                          },
+                        ),
+                      )),
+                const SizedBox(height: 24),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          ..._joinedEvents.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: EventCard(event: e, isMyEvent: true),
-              )),
-        ],
+          );
+        },
       ),
     );
+  }
+
+  EventData _toCardData(Event e) {
+    return EventData(
+      title: e.title,
+      time: _formatTime(e.endTime),
+      host: 'Host #${e.userId}',
+      category: e.category,
+      capacity: '${e.capacity}',
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    final local = dt.toLocal();
+    final h = local.hour;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final hour12 = h % 12 == 0 ? 12 : h % 12;
+    return '$hour12 $period';
   }
 
   InputDecoration _inputDecoration(String hint) {

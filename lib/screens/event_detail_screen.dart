@@ -13,24 +13,35 @@ class EventDetailScreen extends StatefulWidget {
 }
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
-  late Future<List<Participant>> _participantsFuture;
+  int? _participantCount;
   bool _joined = false;
   bool _joining = false;
+
+  bool get _isFull =>
+      _participantCount != null && _participantCount! >= widget.event.capacity;
 
   @override
   void initState() {
     super.initState();
-    _participantsFuture = EventService().listParticipants(widget.event.id);
-    _participantsFuture.then((list) {
+    _loadParticipants();
+  }
+
+  Future<void> _loadParticipants() async {
+    try {
+      final list = await EventService().listParticipants(widget.event.id);
+      if (!mounted) return;
       final me = AuthService().currentUserId;
-      if (me != null && mounted) {
-        setState(() => _joined = list.any((p) => p.userId == me));
-      }
-    }).catchError((_) {});
+      setState(() {
+        _participantCount = list.length;
+        if (me != null) _joined = list.any((p) => p.userId == me);
+      });
+    } catch (_) {
+      // Leave _participantCount as null so the label falls back to "—".
+    }
   }
 
   Future<void> _handleJoin() async {
-    if (_joining || _joined) return;
+    if (_joining || _joined || _isFull) return;
     final userId = AuthService().currentUserId;
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,10 +54,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     try {
       await EventService().joinEvent(widget.event.id, userId);
       if (!mounted) return;
-      setState(() {
-        _joined = true;
-        _participantsFuture = EventService().listParticipants(widget.event.id);
-      });
+      setState(() => _joined = true);
+      await _loadParticipants();
+      if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -236,28 +246,21 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           const SizedBox(height: 24),
                           Text('Capacity', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
                           const SizedBox(height: 6),
-                          FutureBuilder<List<Participant>>(
-                            future: _participantsFuture,
-                            builder: (context, snapshot) {
-                              final count = snapshot.data?.length;
-                              final label = count != null
-                                  ? '$count / ${event.capacity}'
-                                  : '— / ${event.capacity}';
-                              return Text(
-                                label,
-                                style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A2E)),
-                              );
-                            },
+                          Text(
+                            _participantCount != null
+                                ? '$_participantCount / ${event.capacity}'
+                                : '— / ${event.capacity}',
+                            style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A2E)),
                           ),
                           const Spacer(),
                           Center(
                             child: ElevatedButton(
-                              onPressed: (_joined || _joining) ? null : _handleJoin,
+                              onPressed: (_joined || _joining || _isFull) ? null : _handleJoin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _joined
+                                backgroundColor: (_joined || _isFull)
                                     ? Colors.grey[300]
                                     : const Color(0xFFD966A8),
-                                foregroundColor: _joined ? Colors.grey : Colors.white,
+                                foregroundColor: (_joined || _isFull) ? Colors.grey : Colors.white,
                                 disabledBackgroundColor: Colors.grey[300],
                                 disabledForegroundColor: Colors.grey,
                                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
@@ -276,7 +279,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                       ),
                                     )
                                   : Text(
-                                      _joined ? 'Joined!' : 'Join',
+                                      _joined
+                                          ? 'Joined!'
+                                          : (_isFull ? 'Full' : 'Join'),
                                       style: const TextStyle(
                                         fontSize: 17,
                                         fontWeight: FontWeight.w600,
