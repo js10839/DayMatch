@@ -29,13 +29,29 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isProfileTab = true;
 
-  // Pre-filled with mock data — replace with real user data later
-  final _nickNameController = TextEditingController(text: 'NYU Timothée Chalamet...');
-  final _pronounsController = TextEditingController(text: 'She / Her');
-  final _genderController = TextEditingController(text: 'Male');
+  final _nickNameController = TextEditingController();
+  final _pronounsController = TextEditingController();
+  final _genderController = TextEditingController();
   final _ethnicityController = TextEditingController();
-  DateTime? _dateOfBirth = DateTime(2000, 6, 13);
+  DateTime? _dateOfBirth;
   String? _selectedCollege;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = AuthService().currentUser;
+    if (user != null) {
+      _nickNameController.text = (user['name'] as String?) ?? '';
+      _pronounsController.text = (user['pronouns'] as String?) ?? '';
+      _genderController.text = (user['gender'] as String?) ?? '';
+      _ethnicityController.text = (user['ethnicity'] as String?) ?? '';
+      _selectedCollege = user['college'] as String?;
+      final birth = user['birth_data'] as String?;
+      if (birth != null && birth.isNotEmpty) {
+        _dateOfBirth = DateTime.tryParse(birth);
+      }
+    }
+  }
 
   @override
   void dispose() {
