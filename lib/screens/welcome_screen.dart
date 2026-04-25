@@ -39,7 +39,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   'Day\nMatch',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.jersey25(
-                    fontSize: 96,
+                    fontSize: 90,
                     color: const Color(0xFF57068C),
                     height: 1.1,
                   ),

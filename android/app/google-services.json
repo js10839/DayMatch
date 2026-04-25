@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "66873610716",
+    "project_id": "daymatch-fe77a",
+    "storage_bucket": "daymatch-fe77a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:66873610716:android:e3d7adfe6b789882007f19",
+        "android_client_info": {
+          "package_name": "com.daymatch.daymatch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzR6zUoY90jnbtoZtdswc5gfSpJYjlHtw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

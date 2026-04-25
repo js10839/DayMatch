@@ -1,7 +1,24 @@
 import 'package:flutter/material.dart';
+import 'all_set_screen.dart';
+import 'chat_screen.dart';
 
-class EventDetailScreen extends StatelessWidget {
+class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({super.key});
+
+  @override
+  State<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+class _EventDetailScreenState extends State<EventDetailScreen> {
+  bool _joined = false;
+
+  Future<void> _handleJoin() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AllSetScreen()),
+    );
+    if (mounted) setState(() => _joined = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +119,19 @@ class EventDetailScreen extends StatelessWidget {
                     color: Colors.white.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatScreen(
+                          eventId: 'jasper-kane-event',
+                          eventName: 'Colin Sung',
+                          currentUserId: 'user-123',
+                          currentUserName: 'Me',
+                        ),
+                      ),
+                    ),
+                    child: const Row(
                     children: [
                       Icon(Icons.send, color: Colors.white, size: 14),
                       SizedBox(width: 6),
@@ -118,6 +147,7 @@ class EventDetailScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
               ],
             ),
           ),
@@ -172,19 +202,19 @@ class EventDetailScreen extends StatelessWidget {
                           const Spacer(),
                           Center(
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: _joined ? null : _handleJoin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFD966A8),
-                                foregroundColor: Colors.white,
+                                backgroundColor: _joined ? Colors.grey[300] : const Color(0xFFD966A8),
+                                foregroundColor: _joined ? Colors.grey : Colors.white,
                                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 elevation: 0,
                               ),
-                              child: const Text(
-                                'Join',
-                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                              child: Text(
+                                _joined ? 'Joined!' : 'Join',
+                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                               ),
                             ),
                           ),
