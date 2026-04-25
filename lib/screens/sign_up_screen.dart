@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'welcome_screen.dart';
 
 const _nyuColleges = [
   'College of Arts & Science',
@@ -83,6 +84,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _handleRegister() {
     // TODO: send profile data to backend
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+    );
   }
 
   @override
