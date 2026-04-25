@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../widgets/event_card.dart';
+import 'sign_in_screen.dart';
 
 const _nyuColleges = [
   'College of Arts & Science',
@@ -58,6 +60,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     if (picked != null) setState(() => _dateOfBirth = picked);
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to sign in again to use the app.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await AuthService().logout();
+    } catch (_) {
+      // Even if the server call fails, tokens are cleared locally.
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const SignInScreen()),
+      (_) => false,
+    );
   }
 
   Future<void> _pickCollege() async {
@@ -232,6 +267,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 elevation: 0,
               ),
               child: const Text('Save', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _handleLogout,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                side: const BorderSide(color: Colors.red, width: 1.5),
+              ),
+              child: const Text('Log Out', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(height: 32),
