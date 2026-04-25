@@ -37,20 +37,22 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
   }
 
   // Parses strings like "10 AM", "10:30 AM", "14:00", or "2 pm" into a
-  // DateTime today (or tomorrow if the slot has already passed). Falls
-  // back to one hour from now when the input can't be understood.
-  DateTime _parseEndTime(String raw) {
+  // DateTime today (or tomorrow if the slot has already passed). Returns
+  // null when the input is empty or doesn't match a recognised format.
+  DateTime? _parseEndTime(String raw) {
     final now = DateTime.now();
     final s = raw.trim().toUpperCase();
+    if (s.isEmpty) return null;
     final match = RegExp(r'^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$').firstMatch(s);
-    if (match == null) return now.add(const Duration(hours: 1));
+    if (match == null) return null;
 
-    var hour = int.tryParse(match.group(1) ?? '') ?? 0;
-    final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+    var hour = int.tryParse(match.group(1) ?? '') ?? -1;
+    final minute = int.tryParse(match.group(2) ?? '0') ?? -1;
     final period = match.group(3);
+    if (hour < 0 || minute < 0) return null;
     if (period == 'AM' && hour == 12) hour = 0;
     if (period == 'PM' && hour < 12) hour += 12;
-    if (hour > 23 || minute > 59) return now.add(const Duration(hours: 1));
+    if (hour > 23 || minute > 59) return null;
 
     var when = DateTime(now.year, now.month, now.day, hour, minute);
     if (when.isBefore(now)) when = when.add(const Duration(days: 1));
@@ -78,13 +80,21 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
       return;
     }
 
+    final endTime = _parseEndTime(_timeController.text);
+    if (endTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a time like "10 AM", "2:30 PM", or "14:00".')),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
     try {
       await EventService().createEvent(
         userId: userId,
         title: title,
         category: _selectedCategory,
-        endTime: _parseEndTime(_timeController.text),
+        endTime: endTime,
         capacity: capacity,
       );
       if (!mounted) return;
@@ -192,7 +202,7 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
                       label: 'Time',
                       child: TextField(
                         controller: _timeController,
-                        decoration: _inputDecoration('10 AM'),
+                        decoration: _inputDecoration('10:25 AM'),
                       ),
                     ),
                     const SizedBox(height: 16),
