@@ -29,7 +29,7 @@ exports.login = async (req, res, next) => {
     const { email, password } = req.body;
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
+    if (error) return res.status(401).json({ message: 'Invalid email or password.' });
 
     const { data: userData } = await supabase
       .from('user')
@@ -54,7 +54,7 @@ exports.getMe = async (req, res, next) => {
       .eq('email', req.user.email)
       .single();
 
-    if (error) return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    if (error) return res.status(404).json({ message: 'User not found.' });
 
     res.json({ user: userData });
   } catch (err) {
