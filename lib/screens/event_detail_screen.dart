@@ -15,7 +15,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Future<void> _handleJoin() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AllSetScreen()),
+      MaterialPageRoute(builder: (_) => const AllSetScreen(personName: 'Colin')),
     );
     if (mounted) setState(() => _joined = true);
   }

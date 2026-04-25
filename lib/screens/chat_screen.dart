@@ -108,16 +108,6 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF57068C), width: 1.5),
-                    ),
-                    child: const Icon(Icons.person_outline, color: Color(0xFF57068C), size: 20),
-                  ),
-                  const SizedBox(width: 10),
                   Text(
                     widget.eventName,
                     style: const TextStyle(

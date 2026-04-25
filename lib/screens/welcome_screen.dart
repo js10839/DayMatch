@@ -41,7 +41,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   style: GoogleFonts.jersey25(
                     fontSize: 90,
                     color: const Color(0xFF57068C),
-                    height: 1.1,
+                    height: 1,
                   ),
                 ),
               ),
