@@ -41,21 +41,21 @@ class _SignInScreenState extends State<SignInScreen> {
                     'Day\nMatch',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.jersey25(
-                      fontSize: 80,
-                      color: const Color(0xFF6B21E8),
+                      fontSize: 96,
+                      color: const Color(0xFF57068C),
                       height: 1.1,
                     ),
                   ),
                 ),
               ),
               // Section 3: slogan
-              const Expanded(
+              Expanded(
                 child: Center(
                   child: Text(
                     'Match Your Day',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
+                    style: GoogleFonts.jersey25(
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A2E),
                     ),

@@ -30,7 +30,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _selectedCollege;
   final _ethnicityController = TextEditingController();
   DateTime? _dateOfBirth;
-  bool _ethnicityObscured = true;
 
   @override
   void dispose() {
@@ -179,7 +178,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: _fieldDecoration(),
                           child: Row(
                             children: [
-                              const Icon(Icons.keyboard_arrow_down, size: 22, color: Colors.grey),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
@@ -187,6 +185,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A2E)),
                                 ),
                               ),
+                              const Icon(Icons.keyboard_arrow_down, size: 22, color: Colors.grey),
                             ],
                           ),
                         ),
@@ -197,17 +196,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       label: 'Ethnicity',
                       child: TextField(
                         controller: _ethnicityController,
-                        obscureText: _ethnicityObscured,
-                        decoration: _inputDecoration('').copyWith(
-                          suffixIcon: GestureDetector(
-                            onTap: () => setState(() => _ethnicityObscured = !_ethnicityObscured),
-                            child: Icon(
-                              _ethnicityObscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              color: Colors.grey,
-                              size: 20,
-                            ),
-                          ),
-                        ),
+                        decoration: _inputDecoration('e.g. Asian, Hispanic, White...'),
                       ),
                     ),
                     const SizedBox(height: 32),
