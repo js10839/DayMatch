@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'welcome_screen.dart';
 
 const _nyuColleges = [
   'College of Arts & Science',
@@ -142,9 +143,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         birthData: _dateOfBirth != null ? _formatDate(_dateOfBirth!) : null,
       );
       if (!mounted) return;
-      setState(() => _completed = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile completed!')),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
       );
     } catch (e) {
       if (mounted) {

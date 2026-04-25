@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import 'home_screen.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -20,8 +21,9 @@ class _SignInScreenState extends State<SignInScreen> {
       final result = await AuthService().signInWithGoogle();
       if (!mounted) return;
       if (result.hasProfile) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Already registered. Welcome back!')),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else {
         Navigator.pushReplacement(
@@ -64,9 +66,9 @@ class _SignInScreenState extends State<SignInScreen> {
                     'Day\nMatch',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.jersey25(
-                      fontSize: 96,
+                      fontSize: 90,
                       color: const Color(0xFF57068C),
-                      height: 1.1,
+                      height: 1,
                     ),
                   ),
                 ),

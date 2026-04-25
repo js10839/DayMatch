@@ -1,9 +1,14 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'firebase_options.dart';
+import 'screens/home_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/sign_up_screen.dart';
 import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const DayMatchApp());
 }
 
@@ -41,11 +46,10 @@ class _SplashGateState extends State<_SplashGate> {
     final me = await AuthService().getMe();
     if (me == null) return const SignInScreen();
 
+    if (me.hasProfile) return const HomeScreen();
+
     final name = me.user?['name'] as String?;
-    return SignUpScreen(
-      initialName: name,
-      alreadyCompleted: me.hasProfile,
-    );
+    return SignUpScreen(initialName: name);
   }
 
   @override
