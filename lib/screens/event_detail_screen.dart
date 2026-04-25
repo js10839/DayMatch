@@ -20,9 +20,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   bool get _isFull =>
       _participantCount != null && _participantCount! >= widget.event.capacity;
 
+  bool get _isHost {
+    final me = AuthService().currentUserId;
+    return me != null && widget.event.userId == me;
+  }
+
   @override
   void initState() {
     super.initState();
+    final me = AuthService().currentUserId;
+    if (me != null && widget.event.userId == me) {
+      _joined = true;
+    }
     _loadParticipants();
   }
 
@@ -33,7 +42,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       final me = AuthService().currentUserId;
       setState(() {
         _participantCount = list.length;
-        if (me != null) _joined = list.any((p) => p.userId == me);
+        if (me != null) {
+          _joined = widget.event.userId == me ||
+              list.any((p) => p.userId == me);
+        }
       });
     } catch (_) {
       // Leave _participantCount as null so the label falls back to "—".
@@ -71,6 +83,39 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       }
     } finally {
       if (mounted) setState(() => _joining = false);
+    }
+  }
+
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete event?'),
+        content: const Text('This will remove the event and all RSVPs. This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await EventService().deleteEvent(widget.event.id);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      }
     }
   }
 
@@ -289,6 +334,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                     ),
                             ),
                           ),
+                          if (_isHost) ...[
+                            const SizedBox(height: 12),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: _handleDelete,
+                                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                                label: const Text(
+                                  'Delete event',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                         ],
                       ),

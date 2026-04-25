@@ -150,6 +150,16 @@ class EventService {
     return Event.fromJson(body['event'] as Map<String, dynamic>);
   }
 
+  Future<void> deleteEvent(int eventId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/events/$eventId'),
+      headers: await _headers(),
+    );
+    if (response.statusCode == 200) return;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    throw Exception(body['message'] ?? 'Failed to delete event.');
+  }
+
   Future<void> joinEvent(int eventId, int userId) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/events/$eventId/join'),

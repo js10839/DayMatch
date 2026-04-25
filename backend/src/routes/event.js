@@ -17,5 +17,6 @@ router.post('/:id/join', eventController.joinEvent);
 router.delete('/:id/join', eventController.leaveEvent);
 
 router.get('/:id', eventController.getEventById);
+router.delete('/:id', eventController.deleteEvent);
 
 module.exports = router;

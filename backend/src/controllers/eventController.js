@@ -10,13 +10,14 @@ function tokenFrom(req) {
   return req.headers.authorization.split(' ')[1];
 }
 
-// GET /api/events — list all events
+// GET /api/events — list events whose end_time is still in the future
 exports.getEvents = async (req, res, next) => {
   try {
     const supabase = clientWithToken(tokenFrom(req));
     const { data, error } = await supabase
       .from('event')
       .select('*')
+      .gt('end_time', new Date().toISOString())
       .order('upload_time', { ascending: false });
 
     if (error) return res.status(400).json({ message: error.message });
@@ -66,6 +67,15 @@ exports.createEvent = async (req, res, next) => {
       .single();
 
     if (error) return res.status(400).json({ message: error.message });
+
+    const { error: linkError } = await supabase
+      .from('event_user_link')
+      .insert({ user_id, event_id: data.event_id });
+
+    if (linkError) {
+      await supabase.from('event').delete().eq('event_id', data.event_id);
+      return res.status(400).json({ message: linkError.message });
+    }
 
     res.status(201).json({
       message: 'Event created successfully.',
@@ -207,6 +217,48 @@ exports.leaveEvent = async (req, res, next) => {
     if (error) return res.status(400).json({ message: error.message });
 
     res.json({ message: 'Left event successfully.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/events/:id — delete an event (host only)
+exports.deleteEvent = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const supabase = clientWithToken(tokenFrom(req));
+
+    const { data: caller, error: callerError } = await supabase
+      .from('user')
+      .select('user_id')
+      .eq('email', req.user.email)
+      .single();
+
+    if (callerError || !caller) {
+      return res.status(401).json({ message: 'User not found.' });
+    }
+
+    const { data: event, error: eventError } = await supabase
+      .from('event')
+      .select('user_id')
+      .eq('event_id', id)
+      .single();
+
+    if (eventError || !event) {
+      return res.status(404).json({ message: 'Event not found.' });
+    }
+
+    if (event.user_id !== caller.user_id) {
+      return res.status(403).json({ message: 'Only the host can delete this event.' });
+    }
+
+    await supabase.from('event_user_link').delete().eq('event_id', id);
+
+    const { error } = await supabase.from('event').delete().eq('event_id', id);
+
+    if (error) return res.status(400).json({ message: error.message });
+
+    res.json({ message: 'Event deleted successfully.' });
   } catch (err) {
     next(err);
   }
