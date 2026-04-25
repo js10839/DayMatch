@@ -98,6 +98,7 @@ exports.getMyEvents = async (req, res, next) => {
       .from('event')
       .select(EVENT_WITH_HOST)
       .eq('user_id', userId)
+      .gt('end_time', new Date().toISOString())
       .order('upload_time', { ascending: false });
 
     if (error) return res.status(400).json({ message: error.message });

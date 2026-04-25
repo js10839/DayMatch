@@ -17,7 +17,6 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
   final _locationController = TextEditingController();
   final _timeController = TextEditingController();
   final _partyController = TextEditingController();
-  final _messageController = TextEditingController();
   File? _photo;
   String _selectedCategory = _categoryOptions[0];
   bool _submitting = false;
@@ -27,7 +26,6 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
     _locationController.dispose();
     _timeController.dispose();
     _partyController.dispose();
-    _messageController.dispose();
     super.dispose();
   }
 
@@ -245,17 +243,6 @@ class _UploadEventScreenState extends State<UploadEventScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    _FormField(
-                      label: 'Message',
-                      child: TextField(
-                        controller: _messageController,
-                        maxLines: 5,
-                        decoration: _inputDecoration('').copyWith(
-                          alignLabelWithHint: true,
-                        ),
-                      ),
-                    ),
 
                     const SizedBox(height: 32),
 
