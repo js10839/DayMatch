@@ -10,6 +10,7 @@ class Event {
   final DateTime endTime;
   final int capacity;
   final DateTime? uploadTime;
+  final String? hostName;
 
   Event({
     required this.id,
@@ -19,19 +20,28 @@ class Event {
     required this.endTime,
     required this.capacity,
     this.uploadTime,
+    this.hostName,
   });
 
-  factory Event.fromJson(Map<String, dynamic> json) => Event(
-        id: json['event_id'] as int,
-        userId: json['user_id'] as int,
-        title: json['title'] as String? ?? '',
-        category: json['category'] as String? ?? '',
-        endTime: DateTime.parse(json['end_time'] as String),
-        capacity: (json['capacity'] as num).toInt(),
-        uploadTime: json['upload_time'] != null
-            ? DateTime.parse(json['upload_time'] as String)
-            : null,
-      );
+  String get hostLabel => hostName?.trim().isNotEmpty == true
+      ? hostName!.trim()
+      : 'Host #$userId';
+
+  factory Event.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>?;
+    return Event(
+      id: json['event_id'] as int,
+      userId: json['user_id'] as int,
+      title: json['title'] as String? ?? '',
+      category: json['category'] as String? ?? '',
+      endTime: DateTime.parse(json['end_time'] as String),
+      capacity: (json['capacity'] as num).toInt(),
+      uploadTime: json['upload_time'] != null
+          ? DateTime.parse(json['upload_time'] as String)
+          : null,
+      hostName: user?['name'] as String?,
+    );
+  }
 }
 
 class Participant {

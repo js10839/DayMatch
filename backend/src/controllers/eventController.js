@@ -10,13 +10,15 @@ function tokenFrom(req) {
   return req.headers.authorization.split(' ')[1];
 }
 
+const EVENT_WITH_HOST = '*, user!user_id(name)';
+
 // GET /api/events — list events whose end_time is still in the future
 exports.getEvents = async (req, res, next) => {
   try {
     const supabase = clientWithToken(tokenFrom(req));
     const { data, error } = await supabase
       .from('event')
-      .select('*')
+      .select(EVENT_WITH_HOST)
       .gt('end_time', new Date().toISOString())
       .order('upload_time', { ascending: false });
 
@@ -36,7 +38,7 @@ exports.getEventById = async (req, res, next) => {
 
     const { data, error } = await supabase
       .from('event')
-      .select('*')
+      .select(EVENT_WITH_HOST)
       .eq('event_id', id)
       .single();
 
@@ -94,7 +96,7 @@ exports.getMyEvents = async (req, res, next) => {
 
     const { data, error } = await supabase
       .from('event')
-      .select('*')
+      .select(EVENT_WITH_HOST)
       .eq('user_id', userId)
       .order('upload_time', { ascending: false });
 
@@ -114,7 +116,7 @@ exports.getJoinedEvents = async (req, res, next) => {
 
     const { data, error } = await supabase
       .from('event_user_link')
-      .select('event:event(*)')
+      .select('event:event(*, user!user_id(name))')
       .eq('user_id', userId);
 
     if (error) return res.status(400).json({ message: error.message });

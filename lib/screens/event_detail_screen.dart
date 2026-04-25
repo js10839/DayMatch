@@ -72,7 +72,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => AllSetScreen(personName: 'Host #${widget.event.userId}'),
+          builder: (_) => AllSetScreen(personName: widget.event.hostLabel),
         ),
       );
     } catch (e) {
@@ -164,7 +164,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       child: Column(
                         children: [
                           Text(
-                            'Host #${event.userId}',
+                            event.hostLabel,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 26,

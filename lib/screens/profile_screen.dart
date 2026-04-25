@@ -406,7 +406,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return EventData(
       title: e.title,
       time: _formatTime(e.endTime),
-      host: 'Host #${e.userId}',
+      host: e.hostLabel,
       category: e.category,
       capacity: '${e.capacity}',
     );

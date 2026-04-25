@@ -183,7 +183,7 @@ EventData _toCardData(Event e, {required bool showCapacity}) {
   return EventData(
     title: e.title,
     time: _formatTime(e.endTime),
-    host: 'Host #${e.userId}',
+    host: e.hostLabel,
     category: e.category,
     capacity: showCapacity ? '${e.capacity}' : null,
   );
